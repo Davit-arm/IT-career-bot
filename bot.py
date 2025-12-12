@@ -8,6 +8,14 @@ from ai_service import generate_response
 load_dotenv()
 bot = telebot.TeleBot(os.getenv("TG_API"))
 user_questions_num = {}
+answers = {}
+user_last_message_id ={}
+questions = [" What do you enjoy doing the most?",
+             "What makes you bored the most?",
+             "Which format of work in your opinion fits you the most",
+             "How do you prefer working, in a team or independently",
+             "Whats more important for you?",
+             "That's all the questions I have for now! Thank you for participating in the quiz."]
 
 def generate_start_keyboard():
     start_keyboard = InlineKeyboardMarkup()
@@ -20,18 +28,48 @@ def generate_question_keyboard(question_number):
     questions = InlineKeyboardMarkup(row_width=1)
     if question_number == 1:
         b1 = InlineKeyboardButton(text="Analyze", callback_data="question_1_analyze")
-        b2 = InlineKeyboardButton(text="Creating something artistic", callback_data="question_1_artistic")
-        b3 = InlineKeyboardButton(text="working and creating new technologies", callback_data="question_1_tech")
-        b4 = InlineKeyboardButton(text="communicating with other people", callback_data="question_1_communicate")
-        b5 = InlineKeyboardButton(text="Solving logical problems", callback_data="question_1_solve")
+        b2 = InlineKeyboardButton(text="Creating something artistic", callback_data="question_1_creating_artistic_things")
+        b3 = InlineKeyboardButton(text="working and creating new technologies", callback_data="question_1_creating_and_working_with_tech")
+        b4 = InlineKeyboardButton(text="communicating with other people", callback_data="question_1_communicating_with_people")
+        b5 = InlineKeyboardButton(text="Solving logical problems", callback_data="question_1_solving_problems")
         questions.add(b1,b2,b3,b4,b5)
         return questions
     elif question_number == 2:
         b1 = InlineKeyboardButton(text="Long coding", callback_data="question_2_long_coding")
-        b2 = InlineKeyboardButton(text="Monotonous routine work", callback_data="question_2_routine")
-        b3 = InlineKeyboardButton(text="Talking to clients", callback_data="question_2_talking")
-        b4 = InlineKeyboardButton(text="Artistic work", callback_data="question_2_anti_artistic")
+        b2 = InlineKeyboardButton(text="Monotonous routine work", callback_data="question_2_routine_work")
+        b3 = InlineKeyboardButton(text="Talking to clients", callback_data="question_2_talking_to_clients")
+        b4 = InlineKeyboardButton(text="Artistic work", callback_data="question_2_anti_artistic_work")
         b5 = InlineKeyboardButton(text="None above makes me bored", callback_data="question_2_nothing")
+        questions.add(b1,b2,b3,b4,b5)
+        return questions
+    elif question_number == 3:
+        b1 = InlineKeyboardButton(text="Artistic", callback_data="question_3_artistic")
+        b2 = InlineKeyboardButton(text="Analytic", callback_data="question_3_analytic")
+        b3 = InlineKeyboardButton(text="Technical", callback_data="question_3_technical")
+        b4 = InlineKeyboardButton(text="Communicative", callback_data="question_3_communicative")
+        b5 = InlineKeyboardButton(text="I dont know", callback_data="question_3_nothing")
+        questions.add(b1,b2,b3,b4,b5)
+        return questions
+    elif question_number == 4:
+        b1 = InlineKeyboardButton(text="Alone", callback_data="question_4_alone")
+        b2 = InlineKeyboardButton(text="In a team", callback_data="question_4_in_a_team")
+        b3 = InlineKeyboardButton(text="No difference", callback_data="question_4_no_difference")
+        questions.add(b1,b2,b3)
+        return questions
+    elif question_number == 5:
+        b1 = InlineKeyboardButton(text="High salary", callback_data="question_5_high_salary")
+        b2 = InlineKeyboardButton(text="Quiet work", callback_data="question_5_quiet_work")
+        b3 = InlineKeyboardButton(text="Interesting tasks", callback_data="question_5_interesting_tasks")
+        b4 = InlineKeyboardButton(text="Opportunity for growth", callback_data="question_5_opportunity_for_growth")
+        b5 = InlineKeyboardButton(text="Flexible graphic", callback_data="question_5_flexible_graphic")
+        questions.add(b1,b2,b3,b4,b5)
+        return questions
+    elif question_number == 6:
+        b1 = InlineKeyboardButton(text="A little programming", callback_data="question_6_little_programming")
+        b2 = InlineKeyboardButton(text="Design", callback_data="question_6_design")
+        b3 = InlineKeyboardButton(text="Analytic/tables", callback_data="question_6_analytic")
+        b4 = InlineKeyboardButton(text="Marketing/SMM", callback_data="question_6_marketing")
+        b5 = InlineKeyboardButton(text="Nothing", callback_data="question_6_nothing")
         questions.add(b1,b2,b3,b4,b5)
         return questions
 @bot.message_handler(commands=['start'])
@@ -43,28 +81,29 @@ def send_welcome(message):
     bot.send_message(message.chat.id, text, reply_markup=generate_start_keyboard())
 
 def quiz(message,num_questions):
-    bot.send_message(message.chat.id, "Alright! Let's start up the quiz.")
+    #bot.send_message(message.chat.id, "Alright! Let's start up the quiz.")
     time.sleep(1)
     if num_questions == 1:
-        bot.send_message(message.chat.id, "Question 1: What do you enjoy doing the most?", reply_markup=generate_question_keyboard(1))
+        msg = bot.send_message(message.chat.id, questions[0], reply_markup=generate_question_keyboard(1))
         #num_questions +=1
+        user_last_message_id[message.chat.id] = msg.id
     elif num_questions == 2:
-        bot.send_message(message.chat.id, "What makes you bored the most?", reply_markup=generate_question_keyboard(2))
+        bot.edit_message_text(questions[1],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(2))
         #num_questions +=1
     elif num_questions == 3:
-        bot.send_message(message.chat.id, "Which format of work do you prefer?", reply_markup=generate_question_keyboard(3))
+        bot.edit_message_text(questions[2],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(3))
         #num_questions +=1
     elif num_questions == 4:
-        bot.send_message(message.chat.id, "How do you prefer working, in a team or independently?", reply_markup=generate_question_keyboard(4))
+        bot.edit_message_text(questions[3],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(4))
         #num_questions +=1
     elif num_questions == 5:
-        bot.send_message(message.chat.id, "Whats more important for you?:", reply_markup=generate_question_keyboard(5))
+        bot.edit_message_text(questions[4],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(5))
         #num_questions +=1
     elif num_questions == 6:
-        bot.send_message(message.chat.id, "What skills do you have now?", reply_markup=generate_question_keyboard(6))
+        bot.edit_message_text(questions[5],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(6))
         #num_questions +=1
     else:
-        bot.send_message(message.chat.id, "That's all the questions I have for now! Thank you for participating in the quiz.")
+        bot.edit_message_text("That's all the questions I have for now! Thank you for participating in the quiz.",message.chat.id,user_last_message_id[message.chat.id])
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('start_'))
@@ -73,17 +112,30 @@ def handle_start_keyboard(call):
     if button_text == "describe":
         bot.send_message(call.message.chat.id, "Please describe yourself, your hobbies, favorite subjects, and anything else that might help me recommend a profession for you")
     elif button_text == "quiz":
-        user_questions_num[call.message.chat.id] = 1#
+        user_questions_num[call.message.chat.id] = 1
         bot.send_message(call.message.chat.id, 'Great! I will ask you a few questions that will help me recommend a profession for you.')
         quiz(call.message,1)#
 @bot.callback_query_handler(func=lambda call: call.data.startswith('question_'))
 
 def handle_questions(call):
+
     user_id = call.message.chat.id #finish the buttons and add logic!!!
+    if user_id not in answers:
+        answers[user_id] = {}
     step = user_questions_num.get(user_id, 1)
-    print(f"User {user_id} is on step {step}:{call.data}")
+    questions_text = questions[step - 1]
+    #print(f"User {user_id} is on step {step}:{call.data}")
+    button_text = "_".join(call.data.split('_')[1:])
+    answers[user_id][questions_text] = button_text
     next_step = step + 1
     user_questions_num[user_id] = next_step
-    quiz(call.message, next_step)
-    button_text = call.data.split('_')[1]
-bot.infinity_polling()
+    if next_step <= len(questions):
+        quiz(call.message, next_step)
+    else:
+        bot.send_message(user_id, "Thanks! Processing a suggestion profession for you...")
+        ai_summary = generate_response(f'Here are the quiz answers of a user. Analyze them and recommend an IT profession:{answers[user_id]}')
+        bot.send_message(user_id,ai_summary)
+        #bot.send_message(user_id, f'Final answers:{answers[user_id]}') 
+    
+
+bot.infinity_polling() 
