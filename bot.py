@@ -1,4 +1,5 @@
 import telebot
+from datetime import datetime
 from dotenv import load_dotenv
 import os
 import time
@@ -6,6 +7,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from DB_logic import DB_manager
 from ai_service import generate_response
 load_dotenv()
+manager = DB_manager(os.getenv("DB_NAME"))
 bot = telebot.TeleBot(os.getenv("TG_API"))
 user_questions_num = {}
 answers = {}
@@ -15,7 +17,7 @@ questions = [" What do you enjoy doing the most?",
              "Which format of work in your opinion fits you the most",
              "How do you prefer working, in a team or independently",
              "Whats more important for you?",
-             "That's all the questions I have for now! Thank you for participating in the quiz."]
+             "What skills do you already have or want to develop?"]
 
 def generate_start_keyboard():
     start_keyboard = InlineKeyboardMarkup()
@@ -105,21 +107,30 @@ def quiz(message,num_questions):
     else:
         bot.edit_message_text("That's all the questions I have for now! Thank you for participating in the quiz.",message.chat.id,user_last_message_id[message.chat.id])
 
+def describe(message):
+    bot.send_message(message.chat.id, "Thanks! Processing a suggestion profession for you...")
+    description = message.text
+    user_id = message.chat.id
+    today = datetime.now().strftime("%d-%m-%Y")
+    ai_summary = generate_response(f'Based on the following description of a user, recommend an IT profession that would suit them best, dont make the answer too long:{description}')
+    bot.send_message(user_id,ai_summary)
+    manager.add_info_desc(user_id, description, ai_summary, today)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('start_'))
 def handle_start_keyboard(call):
     button_text = call.data.split('_')[1]
     if button_text == "describe":
         bot.send_message(call.message.chat.id, "Please describe yourself, your hobbies, favorite subjects, and anything else that might help me recommend a profession for you")
+        bot.register_next_step_handler(call.message, describe)
     elif button_text == "quiz":
         user_questions_num[call.message.chat.id] = 1
         bot.send_message(call.message.chat.id, 'Great! I will ask you a few questions that will help me recommend a profession for you.')
-        quiz(call.message,1)#
+        quiz(call.message,1)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('question_'))
-
 def handle_questions(call):
-
-    user_id = call.message.chat.id #finish the buttons and add logic!!!
+    user_id = call.message.chat.id 
     if user_id not in answers:
         answers[user_id] = {}
     step = user_questions_num.get(user_id, 1)
@@ -129,13 +140,16 @@ def handle_questions(call):
     answers[user_id][questions_text] = button_text
     next_step = step + 1
     user_questions_num[user_id] = next_step
+    today = datetime.now()
     if next_step <= len(questions):
         quiz(call.message, next_step)
     else:
-        bot.send_message(user_id, "Thanks! Processing a suggestion profession for you...")
-        ai_summary = generate_response(f'Here are the quiz answers of a user. Analyze them and recommend an IT profession:{answers[user_id]}')
+        bot.edit_message_text("Thanks! Processing a suggestion profession for you...",call.message.chat.id,user_last_message_id[user_id])
+        ai_summary = generate_response(f'Here are the quiz answers of a user. Analyze them and recommend an IT profession, dont make the answer too long!!!:{answers[user_id]}')
         bot.send_message(user_id,ai_summary)
+        manager.add_info_quiz(user_id, str(answers[user_id]), ai_summary, today.strftime("%d-%m-%Y"))
         #bot.send_message(user_id, f'Final answers:{answers[user_id]}') 
     
-
-bot.infinity_polling() 
+if __name__ == '__main__':
+    manager.make_tables()
+    bot.infinity_polling() 
