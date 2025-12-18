@@ -1,5 +1,4 @@
 import sqlite3
-import json
 class DB_manager():
 
     def __init__(self, db_name):
