@@ -12,6 +12,9 @@ bot = telebot.TeleBot(os.getenv("TG_API"))
 user_questions_num = {}
 answers = {}
 user_last_message_id ={}
+last_ai_response = {}
+pending_feedback = {}
+
 questions = [" What do you enjoy doing the most?",
              "What makes you bored the most?",
              "Which format of work in your opinion fits you the most",
@@ -25,6 +28,22 @@ def generate_start_keyboard():
     b2 = InlineKeyboardButton(text="Quiz🧐", callback_data='start_quiz')
     start_keyboard.add(b1, b2)
     return start_keyboard
+
+def generate_desc_feedback_keyboard():
+    feedback_desc_keyboard = InlineKeyboardMarkup()
+    b1 = InlineKeyboardButton(text='good😊',callback_data="feedback_desc_good")
+    b2 = InlineKeyboardButton(text='neutral😐',callback_data='feedback_desc_neutral')
+    b3 = InlineKeyboardButton(text='bad🙁', callback_data='feedback_desc_bad')
+    feedback_desc_keyboard.add(b1,b2,b3)
+    return feedback_desc_keyboard
+
+def generate_quiz_feedback_keyboard():
+    feedback_quiz_keyboard = InlineKeyboardMarkup()
+    b1 = InlineKeyboardButton(text='good😊',callback_data="feedback_quiz_good")
+    b2 = InlineKeyboardButton(text='neutral😐',callback_data='feedback_quiz_neutral')
+    b3 = InlineKeyboardButton(text='bad🙁', callback_data='feedback_quiz_bad')
+    feedback_quiz_keyboard.add(b1,b2,b3)
+    return feedback_quiz_keyboard
 
 def generate_question_keyboard(question_number):
     questions = InlineKeyboardMarkup(row_width=1)
@@ -88,7 +107,7 @@ def quiz(message,num_questions):
     if num_questions == 1:
         msg = bot.send_message(message.chat.id, questions[0], reply_markup=generate_question_keyboard(1))
         #num_questions +=1
-        user_last_message_id[message.chat.id] = msg.id
+        user_last_message_id[message.chat.id] = msg.message_id
     elif num_questions == 2:
         bot.edit_message_text(questions[1],message.chat.id,user_last_message_id[message.chat.id],reply_markup=generate_question_keyboard(2))
         #num_questions +=1
@@ -111,10 +130,33 @@ def describe(message):
     bot.send_message(message.chat.id, "Thanks! Processing a suggestion profession for you🎇...")
     description = message.text
     user_id = message.chat.id
-    today = datetime.now().strftime("%d-%m-%Y")
-    ai_summary = generate_response(f'Based on the following description of a user, recommend an IT profession that would suit them best, dont make the answer too long, use some emojis, dont make the answer too hard to understand:{description}')
-    bot.send_message(user_id,ai_summary)
+    today = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    ai_summary = generate_response(f'Based on the following description of a user, recommend an IT profession that would suit them best, dont make the answer too long, use some emojis, dont make the answer too hard to understand,make it look clean,always use markdown to make texts look bold(*text*),and in the end add "how would you rate this response?" for feedback:{description}')
+    bot.send_message(user_id,ai_summary,parse_mode='Markdown', reply_markup=generate_desc_feedback_keyboard())
+    last_ai_response[user_id] = ai_summary
     manager.add_info_desc(user_id, description, ai_summary, today)
+
+def feedback_desc(message):
+    user_id = message.chat.id
+    feedback_description = message.text
+    ai_summary = last_ai_response[message.chat.id]
+    if user_id in pending_feedback:
+        feedback_text = pending_feedback[user_id]
+        manager.add_feedback_desc(ai_summary, feedback_text, feedback_description)
+        bot.send_message(user_id, "Thank you for your feedback!😊")
+    else:
+        pass
+
+def feedback_quiz(message):
+    user_id = message.chat.id
+    feedback_description = message.text
+    ai_summary = last_ai_response[message.chat.id]
+    if user_id in pending_feedback:
+        feedback_text = pending_feedback[user_id]
+        manager.add_feedback_quiz(ai_summary, feedback_text, feedback_description)
+        bot.send_message(user_id, "Thank you for your feedback!😊")
+    else:
+        pass
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('start_'))
 def handle_start_keyboard(call):
@@ -145,11 +187,32 @@ def handle_questions(call):
         quiz(call.message, next_step)
     else:
         bot.edit_message_text("Thanks! Processing a suggestion profession for you..🎇",call.message.chat.id,user_last_message_id[user_id])
-        ai_summary = generate_response(f'Here are the quiz answers of a user. Analyze them and recommend an IT profession, dont make the answer too long, use some emojis and dont make the response too hard to understand.:{answers[user_id]}')
-        bot.send_message(user_id,ai_summary)
-        manager.add_info_quiz(user_id, str(answers[user_id]), ai_summary, today.strftime("%d-%m-%Y"))
+        ai_summary = generate_response(f'Here are the quiz answers of a user. Analyze them and recommend an IT profession, dont make the answer too long, use some emojis,dont make the response too hard to understand,make it look clean, always use markdown to make texts bold (*text*),and in the end add "how would you rate this response?" for feedback:{answers[user_id]}')
+        bot.send_message(user_id,ai_summary,parse_mode='Markdown',reply_markup=generate_quiz_feedback_keyboard())
+        last_ai_response[user_id] = ai_summary
+        manager.add_info_quiz(user_id, str(answers[user_id]), ai_summary, today.strftime("%d-%m-%Y %H:%M:%S"))
         #bot.send_message(user_id, f'Final answers:{answers[user_id]}') 
-    
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('feedback_'))
+def handle_feedback_desc(call):
+    user_id = call.message.chat.id
+    feedback_text = "_".join(call.data.split('_')[2:])
+    pending_feedback[user_id] = feedback_text
+    if call.data.startswith('feedback_desc_'):
+        if feedback_text == "good":
+            bot.send_message(call.message.chat.id, "Thank you for your feedback!😊")
+            manager.add_feedback_desc(last_ai_response[call.message.chat.id],'good')
+        else:
+            bot.send_message(call.message.chat.id, "What went wrong? How can i improve🧐?")
+            bot.register_next_step_handler(call.message,feedback_desc)
+    else:
+        if feedback_text == "good":
+            bot.send_message(call.message.chat.id, "Thank you for your feedback!😊")
+            manager.add_feedback_quiz(last_ai_response[call.message.chat.id],'good')
+        else:
+            bot.send_message(call.message.chat.id, "What went wrong? How can i improve🧐?")
+            bot.register_next_step_handler(call.message,feedback_quiz)
+
 if __name__ == '__main__':
     manager.make_tables()
     bot.infinity_polling() 

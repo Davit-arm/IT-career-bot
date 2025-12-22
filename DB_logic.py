@@ -12,6 +12,8 @@ class DB_manager():
                     user_id INTEGER NOT NULL,
                     answers TEXT NOT NULL,
                     ai_summary TEXT NOT NULL,
+                    feedback TEXT,
+                    feedback_description TEXT,
                     date TEXT)
 ''')
         cur.execute('''CREATE TABLE IF NOT EXISTS users_describe (
@@ -19,6 +21,8 @@ class DB_manager():
                     user_id INTEGER NOT NULL,
                     description TEXT NOT NULL,
                     ai_summary TEXT NOT NULL,
+                    feedback TEXT,
+                    feedback_description TEXT,
                     date TEXT)
                      ''')
         con.commit()
@@ -45,6 +49,17 @@ class DB_manager():
         except Exception as e:
             return f'Error fetching info: {e}'
         
+    def add_feedback_quiz(self,ai_summary,feedback,feedback_description=None):
+        try:
+            con = sqlite3.connect(self.db_name)
+            cur = con.cursor()
+            cur.execute('''UPDATE users_quiz SET feedback = ?, feedback_description = ? WHERE ai_summary = ?''',(feedback,feedback_description,ai_summary))
+            con.commit()
+            con.close()
+            return 'Feedback added successfully'
+        except Exception as e:
+            return f'Error adding feedback:{e}'
+        
     def add_info_desc(self, user_id, description, ai_summary, date):
         try:
             con = sqlite3.connect(self.db_name)
@@ -65,6 +80,17 @@ class DB_manager():
             return rows
         except Exception as e:
             return f'Error fetching info: {e}'
+        
+    def add_feedback_desc(self,ai_summary,feedback,feedback_description=None):
+        try:
+            con = sqlite3.connect(self.db_name)
+            cur = con.cursor()
+            cur.execute('''UPDATE users_describe SET feedback = ?, feedback_description = ? WHERE ai_summary = ?''',(feedback,feedback_description,ai_summary))
+            con.commit()
+            con.close()
+            return 'Feedback added successfully'
+        except Exception as e:
+            return f'Error adding feedback:{e}'
 
 #test = DB_manager('test.db')
 #print(test.get_all_info())

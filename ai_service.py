@@ -1,27 +1,25 @@
 import os
-from huggingface_hub import InferenceClient
+from openai import OpenAI
 from dotenv import load_dotenv
 import httpx
 load_dotenv()
-def generate_response(prompt: str) -> str:
+
+
+def generate_response(prompt:str) -> str:
     try:
-        client = InferenceClient(
-            api_key=os.getenv("AI_API")
+        client = OpenAI(
+        api_key=os.environ.get("OPENAI_API"),
+        base_url="https://api.groq.com/openai/v1",
+    )
+
+        response = client.responses.create(
+            input=prompt,
+            model="openai/gpt-oss-20b",
         )
-        completion = client.chat.completions.create(
-            model="zai-org/GLM-4.5:nebius",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-        )
-        return completion.choices[0].message["content"]
+        return response.output_text
     except (httpx.ConnectError, httpx.ReadTimeout) as e:
-        print(f"Netork error {e}")
-        return "Connection Error, please try again in a few seconds."
-    
+        return f'Connection error {e},please try again in a gew seconds.'
 
 
+#print(generate_response("Hello,can you read this?"))
 
