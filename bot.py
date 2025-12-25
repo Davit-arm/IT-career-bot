@@ -7,8 +7,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from DB_logic import DB_manager
 from ai_service import generate_response
 load_dotenv()
+
 manager = DB_manager(os.getenv("DB_NAME"))
 bot = telebot.TeleBot(os.getenv("TG_API"))
+
 user_questions_num = {}
 answers = {}
 user_last_message_id ={}
@@ -22,11 +24,14 @@ questions = [" What do you enjoy doing the most?",
              "Whats more important for you?",
              "What skills do you already have or want to develop?"]
 
+
+
 def generate_start_keyboard():
-    start_keyboard = InlineKeyboardMarkup()
+    start_keyboard = InlineKeyboardMarkup(row_width=2)
     b1 = InlineKeyboardButton(text="Describe myself⭐", callback_data="start_describe")
     b2 = InlineKeyboardButton(text="Quiz🧐", callback_data='start_quiz')
-    start_keyboard.add(b1, b2)
+    b3 = InlineKeyboardButton(text="Requirements for a job🖥️", callback_data='start_job')
+    start_keyboard.add(b1, b2,b3)
     return start_keyboard
 
 def generate_desc_feedback_keyboard():
@@ -44,6 +49,14 @@ def generate_quiz_feedback_keyboard():
     b3 = InlineKeyboardButton(text='bad🙁', callback_data='feedback_quiz_bad')
     feedback_quiz_keyboard.add(b1,b2,b3)
     return feedback_quiz_keyboard
+
+def generate_jobreq_feedback_keyboard():
+    feedback_jobreq_keyboard = InlineKeyboardMarkup()
+    b1 = InlineKeyboardButton(text='good😊',callback_data="feedback_jobreq_good")
+    b2 = InlineKeyboardButton(text='neutral😐',callback_data='feedback_jobreq_neutral')
+    b3 = InlineKeyboardButton(text='bad🙁', callback_data='feedback_jobreq_bad')
+    feedback_jobreq_keyboard.add(b1,b2,b3)
+    return feedback_jobreq_keyboard
 
 def generate_question_keyboard(question_number):
     questions = InlineKeyboardMarkup(row_width=1)
@@ -93,13 +106,23 @@ def generate_question_keyboard(question_number):
         b5 = InlineKeyboardButton(text="Nothing🤷‍♂️", callback_data="question_6_nothing")
         questions.add(b1,b2,b3,b4,b5)
         return questions
-@bot.message_handler(commands=['start','menu'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
     text="""\
-    Hi there🙂, I am a bot that helps you find a profession in IT based on your description like, whats your hobby, your favorite subjects and generally about you, if you dont 
-    feel like writing a description about yourself, i can ask you some questions and thanks to do answers i can recommend you a job😊, just click one of the buttons under this message⬇️!\
+    Hi there🙂, I am a bot that helps you find a profession in IT based on your description like, whats your hobby, your favorite subjects and generally about you, if you dont feel like writing a description about yourself, i can ask you some questions and thanks to do answers i can recommend you a job😊, just click one of the buttons under this message⬇️and if you want to know what these buttons do use /menu
     """
     bot.send_message(message.chat.id, text, reply_markup=generate_start_keyboard())
+
+@bot.message_handler(commands=['menu'])
+def menu(message):
+    text = '''Describe myself⭐ = describe yourself so i can suggest you a profession based on your description 🙂
+
+Quiz🧐 = starts a quiz and thanks to your answers i can suggest you a recommended profession🦾
+
+Requirements for a job🖥️ = if you already know what you want to become but dont know what skills you need to have just type in the name of the profession and i will tell you😊
+
+to choose one of the options just click on it under this message ⬇️'''
+    bot.send_message(message.chat.id,text,reply_markup=generate_start_keyboard())
 
 def quiz(message,num_questions):
     #bot.send_message(message.chat.id, "Alright! Let's start up the quiz.")
@@ -136,6 +159,20 @@ def describe(message):
     last_ai_response[user_id] = ai_summary
     manager.add_info_desc(user_id, description, ai_summary, today)
 
+def job_req(message):
+    bot.send_message(message.chat.id, "Thanks! Looking for  some required skills for that profession🎇...")
+    job = message.text
+    user_id = message.chat.id
+    today = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    ai_summary = generate_response(f'What skills should the user have to start working this profession, dont make the answer too long, use some emojis, dont make the answer too hard to understand,make it look clean,always use markdown to make texts look bold(*text*),and in the end add "how would you rate this response?" for feedback:{job}')
+    bot.send_message(user_id,ai_summary,parse_mode='Markdown',reply_markup=generate_jobreq_feedback_keyboard())
+    last_ai_response[user_id] = ai_summary
+    manager.add_info_jobreq(user_id,job,ai_summary,today)
+
+
+
+
+
 def feedback_desc(message):
     user_id = message.chat.id
     feedback_description = message.text
@@ -158,6 +195,15 @@ def feedback_quiz(message):
     else:
         pass
 
+def feedback_jobreq(message):
+    user_id = message.chat.id
+    feedback_description = message.text
+    ai_summary = last_ai_response[message.chat.id]
+    if user_id in pending_feedback:
+        feedback_text = pending_feedback[user_id]
+        manager.add_feedback_jobreq(ai_summary, feedback_text,feedback_description)
+        bot.send_message(user_id,"Thank you for your feedback!😊")
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('start_'))
 def handle_start_keyboard(call):
     button_text = call.data.split('_')[1]
@@ -168,6 +214,9 @@ def handle_start_keyboard(call):
         user_questions_num[call.message.chat.id] = 1
         bot.send_message(call.message.chat.id, 'Great🙂! I will ask you a few questions that will help me recommend a profession for you.')
         quiz(call.message,1)
+    elif button_text == "job":
+        bot.send_message(call.message.chat.id,"Please write the name of the job you want to know the required skills of below⬇️")
+        bot.register_next_step_handler(call.message,job_req)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('question_'))
@@ -205,13 +254,20 @@ def handle_feedback_desc(call):
         else:
             bot.send_message(call.message.chat.id, "What went wrong? How can i improve🧐?")
             bot.register_next_step_handler(call.message,feedback_desc)
-    else:
+    elif call.data.startswith('feedback_quiz_'):
         if feedback_text == "good":
             bot.send_message(call.message.chat.id, "Thank you for your feedback!😊")
             manager.add_feedback_quiz(last_ai_response[call.message.chat.id],'good')
         else:
             bot.send_message(call.message.chat.id, "What went wrong? How can i improve🧐?")
             bot.register_next_step_handler(call.message,feedback_quiz)
+    else:
+        if feedback_text == "good":
+            bot.send_message(call.message.chat.id, "Thank you for your feedback😊")
+            manager.add_feedback_jobreq(last_ai_response[call.message.chat.id],'good')
+        else:
+            bot.send_message(call.message.chat.id,"What went wrong? How can i improve🧐?")
+            bot.register_next_step_handler(call.message, feedback_jobreq)
 
 if __name__ == '__main__':
     manager.make_tables()
