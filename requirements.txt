@@ -1,7 +1,8 @@
 sqlite3
 datetime
 dotenv
-json
-huggingface_hub
+OpenAI
 httpx
 os
+telebot
+time
